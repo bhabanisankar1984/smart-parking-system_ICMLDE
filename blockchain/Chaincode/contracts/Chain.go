@@ -19,7 +19,7 @@ type ParkingSlot struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func (s *SmartContract) UpdateStatus(ctx contractapi.TransactionContextInterface, id string, occupied bool, location string) error {
+func (s *SmartContracts) UpdateStatus(ctx contractapi.TransactionContextInterface, id string, occupied bool, location string) error {
 	slot := ParkingSlot{
 		ID:        id,
 		Location:  location, 
