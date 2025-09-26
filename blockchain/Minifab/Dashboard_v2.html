@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Smart Parking Dashboard - Real Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(31, 38, 135, 0.5);
+        }
+
+        .header {
+            grid-column: 1 / -1;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-online { background-color: #4CAF50; }
+        .status-warning { background-color: #FF9800; }
+        .status-error { background-color: #F44336; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .metric-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .parking-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+            gap: 5px;
+            margin-top: 15px;
+        }
+
+        .parking-slot {
+            width: 40px;
+            height: 25px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .slot-free {
+            background-color: #4CAF50;
+        }
+
+        .slot-occupied {
+            background-color: #F44336;
+        }
+
+        .slot-offline {
+            background-color: #9E9E9E;
+        }
+
+        .parking-slot:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: attr(data-percentage);
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: white;
+            font-weight: bold;
+            font-size: 0.8em;
+        }
+
+        .sensor-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .sensor-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .sensor-item:hover {
+            background: #e8f4f8;
+            transform: translateX(5px);
+        }
+
+        .sensor-id {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .sensor-battery {
+            font-size: 0.9em;
+            padding: 4px 8px;
+            border-radius: 12px;
+            color: white;
+        }
+
+        .battery-good { background-color: #4CAF50; }
+        .battery-medium { background-color: #FF9800; }
+        .battery-low { background-color: #F44336; }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 15px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .blockchain-icon {
+            width: 24px;
+            height: 24px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>') no-repeat center;
+            background-size: contain;
+        }
+
+        .error-banner {
+            grid-column: 1 / -1;
+            background: linear-gradient(90deg, #FF6B6B, #FF8E53);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .update-time {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .real-data-badge {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1> IoT Smart Parking System</h1>
+            <p>Real-time Blockchain-Integrated Parking Management</p>
+            <span class="real-data-badge">LIVE DATA</span>
+            <div class="connection-status">
+                <div class="blockchain-icon"></div>
+                <span id="connection-text">Connecting to IoT Network...</span>
+                <span class="status-indicator status-warning" id="connection-indicator"></span>
+            </div>
+        </div>
+
+        <div class="error-banner" id="error-banner">
+             Unable to connect to IoT data server. Please ensure the API server is running.
+        </div>
+
+        <!-- System Overview -->
+        <div class="card">
+            <h3> System Overview</h3>
+            <div class="metric">
+                <span class="metric-label">Total Parking Slots</span>
+                <span class="metric-value" id="total-slots">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Available Slots</span>
+                <span class="metric-value" id="available-slots" style="color: #4CAF50;">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Occupied Slots</span>
+                <span class="metric-value" id="occupied-slots" style="color: #F44336;">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Occupancy Rate</span>
+                <span class="metric-value" id="occupancy-rate">--%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="occupancy-progress" data-percentage="0%" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- IoT Network Status -->
+        <div class="card">
+            <h3> IoT Network Status</h3>
+            <div class="metric">
+                <span class="metric-label">Active Sensors</span>
+                <span class="metric-value" id="active-sensors">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Network Health</span>
+                <span class="metric-value" id="network-health">--%</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Data Packets/min</span>
+                <span class="metric-value" id="packets-per-min">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Success Rate</span>
+                <span class="metric-value" id="success-rate">--%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="network-progress" data-percentage="0%" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Parking Grid -->
+        <div class="card">
+            <h3> Parking Layout</h3>
+            <div class="parking-grid" id="parking-grid">
+                <!-- Parking slots will be generated here -->
+            </div>
+            <div class="update-time" id="grid-update-time">Waiting for data...</div>
+        </div>
+
+        <!-- Environmental Data -->
+        <div class="card">
+            <h3> Environmental Conditions</h3>
+            <div class="metric">
+                <span class="metric-label">Temperature</span>
+                <span class="metric-value" id="temperature">--°C</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Humidity</span>
+                <span class="metric-value" id="humidity">--%</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Pressure</span>
+                <span class="metric-value" id="pressure">-- hPa</span>
+            </div>
+            <div class="update-time" id="env-update-time">Waiting for data...</div>
+        </div>
+
+        <!-- Battery Status -->
+        <div class="card">
+            <h3> Power Management</h3>
+            <div class="metric">
+                <span class="metric-label">Average Battery</span>
+                <span class="metric-value" id="avg-battery">--%</span>
+            </div>
+            <div class="sensor-list" id="battery-list">
+                <!-- Battery status items will be generated here -->
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card">
+            <h3>Recent Activity</h3>
+            <div class="sensor-list" id="activity-log">
+                <!-- Recent activities will be shown here -->
+            </div>
+        </div>
+
+        <!-- Blockchain Transactions -->
+        <div class="card">
+            <h3>Blockchain Activity</h3>
+            <div class="metric">
+                <span class="metric-label">Total Transactions</span>
+                <span class="metric-value" id="total-transactions">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Successful Updates</span>
+                <span class="metric-value" id="successful-updates">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Success Rate</span>
+                <span class="metric-value" id="blockchain-success-rate">--%</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Avg Response Time</span>
+                <span class="metric-value" id="avg-response-time">-- ms</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Real Data IoT Dashboard
+        class RealDataDashboard {
+            constructor() {
+                this.apiBaseUrl = 'http://localhost:5000/api';
+                this.isConnected = false;
+                this.lastUpdate = null;
+                this.retryCount = 0;
+                this.maxRetries = 5;
+                
+                this.initializeDashboard();
+                this.startDataFetching();
+            }
+
+            initializeDashboard() {
+                console.log(' Initializing Real Data Dashboard...');
+                this.createInitialParkingGrid();
+                this.updateConnectionStatus('connecting');
+            }
+
+            startDataFetching() {
+                // Start fetching data immediately
+                this.fetchAllData();
+                
+                // Set up periodic data fetching
+                setInterval(() => this.fetchAllData(), 5000); // Every 5 seconds
+            }
+
+            async fetchAllData() {
+                try {
+                    const response = await fetch(`${this.apiBaseUrl}/all-data`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        this.processRealData(result.data);
+                        this.updateConnectionStatus('connected');
+                        this.retryCount = 0;
+                        this.hideErrorBanner();
+                    } else {
+                        throw new Error('Invalid response format');
+                    }
+                    
+                } catch (error) {
+                    console.error(' Failed to fetch data:', error);
+                    this.handleConnectionError(error);
+                }
+            }
+
+            processRealData(data) {
+                try {
+                    // Update system overview
+                    this.updateSystemOverview(data.system_overview);
+                    
+                    // Update parking slots
+                    this.updateParkingGrid(data.parking_slots);
+                    
+                    // Update environmental data
+                    this.updateEnvironmentalData(data.environmental);
+                    
+                    // Update battery status
+                    this.updateBatteryStatus(data.battery_status);
+                    
+                    // Update recent activity
+                    this.updateRecentActivity(data.recent_activity);
+                    
+                    // Update blockchain stats
+                    this.updateBlockchainStats(data.blockchain_stats);
+                    
+                    this.lastUpdate = new Date();
+                    
+                } catch (error) {
+                    console.error(' Error processing data:', error);
+                }
+            }
+
+            updateSystemOverview(data) {
+                if (!data) return;
+                
+                document.getElementById('total-slots').textContent = data.total_slots || '--';
+                document.getElementById('available-slots').textContent = data.available_slots || '--';
+                document.getElementById('occupied-slots').textContent = data.occupied_slots || '--';
+                document.getElementById('occupancy-rate').textContent = `${data.occupancy_rate || 0}%`;
+                
+                // Update progress bar
+                const occupancyRate = data.occupancy_rate || 0;
+                const progressBar = document.getElementById('occupancy-progress');
+                progressBar.style.width = `${occupancyRate}%`;
+                progressBar.setAttribute('data-percentage', `${occupancyRate}%`);
+                
+                // Update network status
+                document.getElementById('active-sensors').textContent = data.active_sensors || '--';
+                document.getElementById('network-health').textContent = `${data.network_health || 0}%`;
+                document.getElementById('packets-per-min').textContent = data.packets_per_min || '--';
+                document.getElementById('success-rate').textContent = `${data.success_rate || 0}%`;
+                
+                // Update network progress bar
+                const successRate = data.success_rate || 0;
+                const networkProgress = document.getElementById('network-progress');
+                networkProgress.style.width = `${successRate}%`;
+                networkProgress.setAttribute('data-percentage', `${successRate}%`);
+            }
+
+            updateParkingGrid(slotsData) {
+                if (!slotsData) return;
+                
+                const grid = document.getElementById('parking-grid');
+                grid.innerHTML = ''; // Clear existing slots
+                
+                // Sort slots by ID to maintain consistent order
+                const sortedSlots = Object.values(slotsData).sort((a, b) => a.id - b.id);
+                
+                sortedSlots.forEach(slot => {
+                    const slotElement = document.createElement('div');
+                    slotElement.className = 'parking-slot';
+                    slotElement.id = `slot-${slot.id}`;
+                    slotElement.textContent = slot.id;
+                    
+                    // Set slot status based on real data
+                    if (!slot.online) {
+                        slotElement.classList.add('slot-offline');
+                        slotElement.title = `${slot.node_id} - Offline (Battery: ${slot.battery_level}%)`;
+                    } else if (slot.occupied) {
+                        slotElement.classList.add('slot-occupied');
+                        slotElement.title = `${slot.node_id} - Occupied (${slot.location})`;
+                    } else {
+                        slotElement.classList.add('slot-free');
+                        slotElement.title = `${slot.node_id} - Available (${slot.location})`;
+                    }
+                    
+                    // Add click event for detailed info
+                    slotElement.addEventListener('click', () => this.showSlotDetails(slot));
+                    
+                    grid.appendChild(slotElement);
+                });
+                
+                document.getElementById('grid-update-time').textContent = 
+                    `Last updated: ${new Date().toLocaleTimeString()}`;
+            }
+
+            updateEnvironmentalData(data) {
+                if (!data) return;
+                
+                document.getElementById('temperature').textContent = `${data.temperature || '--'}°C`;
+                document.getElementById('humidity').textContent = `${data.humidity || '--'}%`;
+                document.getElementById('pressure').textContent = `${data.pressure || '--'} hPa`;
+                
+                const updateTime = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '--';
+                document.getElementById('env-update-time').textContent = `Last updated: ${updateTime}`;
+            }
+
+            updateBatteryStatus(batteryData) {
+                if (!batteryData) return;
+                
+                const batteryList = document.getElementById('battery-list');
+                batteryList.innerHTML = '';
+                
+                let totalBattery = 0;
+                let nodeCount = 0;
+                
+                Object.entries(batteryData).forEach(([nodeId, battery]) => {
+                    const item = document.createElement('div');
+                    item.className = 'sensor-item';
+                    
+                    const batteryLevel = Math.round(battery.charge_percentage);
+                    totalBattery += batteryLevel;
+                    nodeCount++;
+                    
+                    const batteryClass = batteryLevel > 60 ? 'battery-good' : 
+                                       batteryLevel > 30 ? 'battery-medium' : 'battery-low';
+                    
+                    const solarIcon = battery.solar_panel ? '* ' : '';
+                    
+                    item.innerHTML = `
+                        <span class="sensor-id">${nodeId} ${solarIcon}</span>
+                        <span class="sensor-battery ${batteryClass}">${batteryLevel}%</span>
+                    `;
+                    
+                    batteryList.appendChild(item);
+                });
+                
+                // Update average battery
+                const avgBattery = nodeCount > 0 ? Math.round(totalBattery / nodeCount) : 0;
+                document.getElementById('avg-battery').textContent = `${avgBattery}%`;
+            }
+
+            updateRecentActivity(activities) {
+                if (!activities || !Array.isArray(activities)) return;
+                
+                const activityLog = document.getElementById('activity-log');
+                activityLog.innerHTML = '';
+                
+                activities.slice(0, 10).forEach(activity => {
+                    const item = document.createElement('div');
+                    item.className = 'sensor-item';
+                    
+                    const icon = activity.type === 'traffic' ? 'car' : 
+                                activity.type === 'warning' ? warning' : 
+                                activity.type === 'system' ? 'system' : 'perf';
+                    
+                    const timestamp = activity.timestamp ? 
+                        new Date(activity.timestamp).toLocaleTimeString() : '--';
+                    
+                    item.innerHTML = `
+                        <div>
+                            <span>${icon} ${activity.message}</span>
+                            <br>
+                            <small style="color: #666;">${activity.details || ''}</small>
+                        </div>
+                        <span style="font-size: 0.8em; color: #666;">${timestamp}</span>
+                    `;
+                    
+                    activityLog.appendChild(item);
+                });
+                
+                if (activities.length === 0) {
+                    activityLog.innerHTML = '<div class="sensor-item">No recent activity</div>';
+                }
+            }
+
+            updateBlockchainStats(stats) {
+                if (!stats) return;
+                
+                document.getElementById('total-transactions').textContent = stats.total_attempts || '--';
+                document.getElementById('successful-updates').textContent = stats.successful_updates || '--';
+                document.getElementById('blockchain-success-rate').textContent = `${stats.success_rate || 0}%`;
+                document.getElementById('avg-response-time').textContent = `${stats.avg_response_time || '--'} ms`;
+            }
+
+            updateConnectionStatus(status) {
+                const indicator = document.getElementById('connection-indicator');
+                const text = document.getElementById('connection-text');
+                
+                switch (status) {
+                    case 'connected':
+                        indicator.className = 'status-indicator status-online';
+                        text.textContent = 'Real-time Data Connected';
+                        this.isConnected = true;
+                        break;
+                    case 'connecting':
+                        indicator.className = 'status-indicator status-warning';
+                        text.textContent = 'Connecting to IoT Network...';
+                        this.isConnected = false;
+                        break;
+                    case 'error':
+                        indicator.className = 'status-indicator status-error';
+                        text.textContent = 'Connection Failed - Retrying...';
+                        this.isConnected = false;
+                        break;
+                }
+            }
+
+            handleConnectionError(error) {
+                this.updateConnectionStatus('error');
+                this.showErrorBanner();
+                this.retryCount++;
+                
+                if (this.retryCount < this.maxRetries) {
+                    console.log(` Retrying connection (${this.retryCount}/${this.maxRetries})...`);
+                    setTimeout(() => this.fetchAllData(), 10000); // Retry after 10 seconds
+                } else {
+                    console.error(' Max retries reached. Please check if the API server is running.');
+                }
+            }
+
+            showErrorBanner() {
+                const banner = document.getElementById('error-banner');
+                banner.style.display = 'block';
+            }
+
+            hideErrorBanner() {
+                const banner = document.getElementById('error-banner');
+                banner.style.display = 'none';
+            }
+
+            createInitialParkingGrid() {
+                const grid = document.getElementById('parking-grid');
+                for (let i = 1; i <= 12; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'parking-slot slot-offline';
+                    slot.id = `slot-${i}`;
+                    slot.textContent = i;
+                    slot.title = 'Waiting for data...';
+                    grid.appendChild(slot);
+                }
+            }
+
+            showSlotDetails(slot) {
+                const status = slot.online ? (slot.occupied ? 'Occupied' : 'Available') : 'Offline';
+                const batteryStatus = slot.battery_level > 60 ? 'Good' : 
+                                   slot.battery_level > 30 ? 'Medium' : 'Low';
+                
+                const details = `
+Parking Slot ${slot.id} Details:
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Status: ${status}
+Node ID: ${slot.node_id}
+Location: ${slot.location}
+Battery Level: ${Math.round(slot.battery_level)}% (${batteryStatus})
+Confidence: ${Math.round((slot.confidence || 0) * 100)}%
+Last Update: ${slot.last_update ? new Date(slot.last_update).toLocaleString() : 'Unknown'}
+
+This data is live from the IoT blockchain integration!
+                `;
+                
+                alert(details);
+            }
+        }
+
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new RealDataDashboard();
+            
+            console.log(' Real Data IoT Dashboard Initialized');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log(' Connecting to real IoT data API...');
+            console.log(' Blockchain integration: LIVE');
+            console.log('IoT sensors: REAL DATA');
+            console.log('API Endpoint: http://localhost:5000/api');
+        });
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                location.reload();
+            }
+        });
+    </script>
+</body>
+</html>
